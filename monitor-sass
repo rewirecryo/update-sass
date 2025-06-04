@@ -1,0 +1,28 @@
+#!/bin/bash
+
+ARGC_MIN=2
+
+print_usage()
+{
+	echo "Syntax: watch-sass <sass_dir> <css_dir>" 1>&2
+}
+
+sass_dir="$1"
+css_dir="$2"
+
+sass_script="./update-sass"
+sass_script_args="-v"
+
+interval=1
+
+if [[ $# -lt ${ARGC_MIN} ]];
+then
+	print_usage
+	exit 1
+fi
+
+# Continually run update-sass on every .scss file
+while ! read -n 1 -t ${interval} answer;
+do
+	/bin/bash <(find "${sass_dir}" -maxdepth 1 -type f -name "*.scss" -printf "\"${sass_script}\" ${sass_script_args} \"${sass_dir}/%f\" \"${css_dir}/%f\";\n" | sed -e 's/scss\";/css\";/g')
+done
