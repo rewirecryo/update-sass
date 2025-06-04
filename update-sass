@@ -1,0 +1,103 @@
+#!/bin/bash
+
+ARGC_MIN=2
+SASS=sassc
+
+sass_file=""
+css_file=""
+verbose=off
+
+print_syntax()
+{
+	echo "Syntax: update-sass <sass-file> <css-file>" 1>&2
+}
+
+if [[ $# -lt ${ARGC_MIN} ]];
+then
+	print_syntax
+fi
+
+# Check whether the .scss file exists, and is newer than the .css
+# file. (In which case, the .css file needs to be updated.)
+#
+# Thanks: https://stackoverflow.com/a/5431932
+needs_update()
+{
+	# If the .scss file doesn't exist, we can't update the .css file;
+	# so, return false.
+	if [[ ! -f "${sass_file}" ]];
+	then
+		return 1
+	fi
+
+	# If the .scss file exists, but the .css file doesn't, the .css
+	# file _definitely_ needs to be updated. Return true.
+	if [[ ! -f "${css_file}" ]];
+	then
+		return 0
+	fi
+
+	# Since both files exist, we can now check when each was last modified.
+	# We'll use this to determine whether the .css file needs updating.
+	#
+	# Thanks: https://stackoverflow.com/a/29726923
+	lm_sass=$(stat -c "%Y" "${sass_file}")
+	lm_css=$(stat -c "%Y" "${css_file}")
+
+	# If the .scss file is newer than the .css file, the .css file needs to
+	# be updated. Return true.
+	if [[ ${lm_sass} -gt ${lm_css} ]];
+	then
+		return 0
+	fi
+
+	# If none of the previous conditions have been met, the file does not
+	# need to be updated. Return false.
+	return 1
+}
+
+do_update()
+{
+	${SASS} "${sass_file}" "${css_file}"
+}
+
+paramn=0
+for arg in $@;
+do
+	if [[ "${arg:0:1}" != "-" ]];
+	then
+		# If this is the first parameter, it's the .scss file
+		if [[ ${paramn} -eq 0 ]];
+		then
+			sass_file="${arg}"
+		# If this is the second parameter, it's the .css file
+		elif [[ ${paramn} -eq 1 ]];
+		then
+			css_file="${arg}"
+		# If we've reached a third parameter, we're beyond the
+		# limit. Abort.
+		else
+			print_syntax
+			exit 1
+		fi
+
+		paramn=$(( ${paramn} + 1 ))
+	else
+		# If it's a -v flag, enable verbose mode
+		if [[ "${arg}" == "-v" || "${arg}" == "--verbose" ]];
+		then
+			verbose=on
+		else
+			verbose=off
+		fi
+	fi
+done
+
+if needs_update;
+then
+	if [[ ${verbose} == on ]];
+	then
+		echo "'${sass_file}' -> '${css_file}'" 1>&2
+	fi
+	do_update
+fi
